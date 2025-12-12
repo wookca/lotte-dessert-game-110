@@ -4,8 +4,24 @@
   <meta charset="UTF-8" />
   <title>롯데리아 디저트 사전예약</title>
 
-  <!-- Pretendard 웹폰트 로드 -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
+  <!-- ======================= Open Graph (카카오톡 미리보기) ======================= -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="롯데리아 디저트 사전예약" />
+  <meta property="og:description" content="미니게임으로 사전예약 도전!" />
+  <meta property="og:image" content="https://wookca.github.io/lotte-dessert-game-110/OG.png" />
+  <meta property="og:url" content="https://wookca.github.io/lotte-dessert-game-110/" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="600" />
+
+  <!-- (선택이지만 권장: 트위터도 같이 커버) -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="롯데리아 디저트 사전예약" />
+  <meta name="twitter:description" content="미니게임으로 사전예약 도전!" />
+  <meta name="twitter:image" content="https://wookca.github.io/lotte-dessert-game-110/OG.png" />
+
+  <!-- Pretendard 웹폰트 -->
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" />
 
   <style>
     body {
@@ -18,21 +34,17 @@
       margin: 0;
       margin-top: 20px;
     }
-
     #gameCanvas {
       border: 2px solid #555;
       image-rendering: pixelated;
       background: #000;
     }
-
     .info {
       margin-top: 10px;
       text-align: center;
       font-size: 14px;
       line-height: 1.4;
     }
-
-    /* 하단 컨트롤 버튼 영역 (텍스트 아래) */
     #bottom-controls {
       margin-top: 16px;
       width: 100%;
@@ -42,35 +54,23 @@
       gap: 12px;
       padding-bottom: 20px;
     }
-
     #bottom-controls button {
-      box-sizing: border-box;
       border: 1px solid #444;
       background: #222;
       color: #f5f5f5;
       font-weight: 600;
       cursor: pointer;
-      touch-action: manipulation; /* 모바일 더블탭 확대 방지 */
+      touch-action: manipulation;
     }
-
-    #bottom-controls button:active {
-      transform: scale(0.96);
-      background: #444;
-    }
-
-    /* 방향 버튼: 동그란 원형 + 매우 크게 (320x320) */
     .direction-btn {
       width: 320px;
       height: 320px;
       border-radius: 50%;
-      font-size: 96px;   /* 화살표 크게 */
-      line-height: 1;
+      font-size: 96px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-
-    /* 다시하기 버튼: 가로로 긴 버튼 */
     .restart-btn {
       width: 100%;
       max-width: 320px;
