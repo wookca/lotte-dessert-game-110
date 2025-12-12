@@ -110,9 +110,184 @@ const ctx = canvas.getContext("2d");
 function randRange(min, max) {
   return min + Math.random() * (max - min);
 }
-
 function clamp(value, min, max) {
   return value < min ? min : (value > max ? max : value);
+}
+function pointInRect(px, py, r) {
+  return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
+}
+
+// ======================= 외부 링크/텍스트 =======================
+const YOUTUBE_URL = "https://www.youtube.com/watch?v=yfsR3TgRbTU";
+const BU1_URL = "https://m.booking.naver.com/booking/6/bizes/1553263/items/7258189?startDate=2025-12-09";
+const BU3_TEXT_TO_COPY = "https://wookca.github.io/lotte-dessert-game-110/";
+
+// ======================= 토스트(복사됨) =======================
+let toastText = "";
+let toastTimer = 0; // seconds
+
+function showToast(text, duration = 1.4) {
+  toastText = text;
+  toastTimer = duration;
+}
+
+// 매 프레임 감소 (running/finished 모두에서 동작)
+function updateToast(dt) {
+  if (toastTimer > 0) {
+    toastTimer -= dt;
+    if (toastTimer < 0) toastTimer = 0;
+  }
+}
+
+function drawToast() {
+  if (!toastTimer || !toastText) return;
+
+  const alpha = clamp(toastTimer / 1.4, 0, 1);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  ctx.font = "14px 'Pretendard'";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const paddingX = 14;
+  const paddingY = 10;
+
+  const textW = ctx.measureText(toastText).width;
+  const boxW = clamp(textW + paddingX * 2, 140, 520);
+  const boxH = 34;
+
+  const x = canvas.width / 2;
+  const y = canvas.height - 45;
+
+  // 박스
+  ctx.fillStyle = "rgba(0,0,0,0.75)";
+  ctx.fillRect(x - boxW / 2, y - boxH / 2, boxW, boxH);
+
+  // 텍스트
+  ctx.fillStyle = "#fff";
+  ctx.fillText(toastText, x, y);
+
+  ctx.restore();
+}
+
+// ======================= 캡쳐 저장 (Bu_2) =======================
+// ======================= 캡쳐 저장 (Bu_2) =======================
+async function saveCanvasAsImage() {
+  const filename = `lotte-dessert-${Date.now()}.png`;
+
+  // 0) CORS/tainted 캔버스 빠른 체크 (막혀있으면 여기서 throw)
+  try {
+    canvas.toDataURL("image/png");
+  } catch (err) {
+    console.error("[CAPTURE] toDataURL failed (tainted canvas?)", err);
+    showToast("저장 실패: CORS/로컬실행 문제");
+    return;
+  }
+
+  // 1) 가능하면 저장 위치 선택창(Chrome/Edge + https/localhost)
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: "PNG Image",
+          accept: { "image/png": [".png"] }
+        }]
+      });
+
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (!blob) {
+        console.error("[CAPTURE] toBlob returned null");
+        showToast("저장 실패: 이미지 생성 불가");
+        return;
+      }
+
+      console.log("[CAPTURE] blob ok (save picker)", { type: blob.type, size: blob.size });
+
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+
+      showToast("저장 완료!");
+      return;
+    } catch (err) {
+      // 사용자가 취소한 경우도 여기로 옴
+      console.warn("[CAPTURE] save picker canceled/failed", err);
+      // 취소했으면 그냥 fallback으로 내려가게 하지 않고 종료할지 선택 가능
+      // 여기서는 "취소"면 그냥 종료:
+      showToast("저장 취소");
+      return;
+    }
+  }
+
+  // 2) 기본 방식: 다운로드 폴더로 저장 (저장 위치 창은 브라우저 설정에 따름)
+  if (!canvas.toBlob) {
+    // 구형 브라우저 fallback: 새 탭으로 열기
+    const dataUrl = canvas.toDataURL("image/png");
+    window.open(dataUrl, "_blank");
+    showToast("새 탭에서 이미지 열림");
+    return;
+  }
+
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      console.error("[CAPTURE] toBlob returned null");
+      showToast("저장 실패: 이미지 생성 불가");
+      return;
+    }
+
+    console.log("[CAPTURE] blob ok (download)", { type: blob.type, size: blob.size });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+
+    requestAnimationFrame(() => {
+      try {
+        a.click();
+        console.log("[CAPTURE] download click triggered");
+        showToast("다운로드 폴더를 확인해줘!");
+      } catch (err) {
+        console.error("[CAPTURE] a.click failed", err);
+        showToast("다운로드 트리거 실패");
+      } finally {
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1500);
+      }
+    });
+  }, "image/png");
+}
+
+
+// ======================= 링크 복사 (Bu_3) =======================
+async function copyTextToClipboard(text) {
+  // 최신
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(text);
+    return true;
+  }
+
+  // fallback
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.left = "-9999px";
+  document.body.appendChild(ta);
+  ta.select();
+
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch (_) {
+    ok = false;
+  }
+  ta.remove();
+  return ok;
 }
 
 // ======================= 전역 상수 =======================
@@ -193,9 +368,6 @@ const ZI_MOVE_CONFIG = {
   wanderMax:      3.0
 };
 
-// 유튜브 링크
-const YOUTUBE_URL = "https://www.youtube.com/watch?v=yfsR3TgRbTU";
-
 // ======================= 이미지 로딩 =======================
 // 메인 화면
 const mainImage = new Image();
@@ -214,6 +386,19 @@ const endImage = new Image();
 endImage.src = "SRC/END.png"; // 800x400
 let endLoaded = false;
 endImage.onload = () => endLoaded = true;
+
+// ===== END 버튼 이미지 로딩 =====
+// Bu_1: 150x42, Bu_2~4: 42x42
+const endButtons = [
+  { key: "bu1", img: new Image(), src: "SRC/Bu_1.png", w: 150, h: 42, loaded: false },
+  { key: "bu2", img: new Image(), src: "SRC/Bu_2.png", w: 42,  h: 42, loaded: false },
+  { key: "bu3", img: new Image(), src: "SRC/Bu_3.png", w: 42,  h: 42, loaded: false },
+  { key: "bu4", img: new Image(), src: "SRC/Bu_4.png", w: 42,  h: 42, loaded: false }
+];
+for (const b of endButtons) {
+  b.img.src = b.src;
+  b.img.onload = () => (b.loaded = true);
+}
 
 // 말풍선
 const speechImg = new Image();
@@ -338,11 +523,50 @@ window.addEventListener("keyup", e => {
   keys[e.code] = false;
 });
 
-// END 화면 클릭 시 유튜브 이동
-canvas.addEventListener("click", () => {
-  if (gameState === "finished") {
-    window.open(YOUTUBE_URL, "_blank");
+// ======================= END 화면 클릭: 버튼만 동작 =======================
+canvas.addEventListener("click", async (e) => {
+  if (gameState !== "finished") return;
+
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+
+  const btns = draw.endButtonRects;
+  if (!btns) return;
+
+  // Bu_1: 네이버 예약 링크
+  if (pointInRect(mx, my, btns.bu1)) {
+    window.open(BU1_URL, "_blank");
+    return;
   }
+
+  // Bu_2: 캡쳐 저장
+  if (pointInRect(mx, my, btns.bu2)) {
+    saveCanvasAsImage();
+    return;
+  }
+
+  // Bu_3: 링크 복사 + 토스트
+  if (pointInRect(mx, my, btns.bu3)) {
+    try {
+      const ok = await copyTextToClipboard(BU3_TEXT_TO_COPY);
+      showToast(ok ? "복사됨!" : "복사 실패");
+    } catch (_) {
+      showToast("복사 실패");
+    }
+    return;
+  }
+
+  // Bu_4: 유튜브 이동
+  if (pointInRect(mx, my, btns.bu4)) {
+    window.open(YOUTUBE_URL, "_blank");
+    return;
+  }
+
+  // ✅ 버튼 밖 클릭: 아무 동작 없음 (기존 유튜브 이동 기능 삭제)
 });
 
 // ======================= 초기화 =======================
@@ -376,6 +600,10 @@ function resetGame() {
   // 입력 상태도 리셋
   keys["ArrowUp"] = false;
   keys["ArrowDown"] = false;
+
+  // 토스트도 리셋(선택)
+  toastText = "";
+  toastTimer = 0;
 }
 
 // ======================= Y 범위 클램프 (골 구간) =======================
@@ -510,7 +738,6 @@ function updateSpeech(dt) {
   speechTimer += dt;
 
   if (speechVisible) {
-    // 켜져 있을 때
     if (speechTimer >= SPEECH_ON_TIME) {
       speechTimer   = 0;
       speechVisible = false;
@@ -522,7 +749,6 @@ function updateSpeech(dt) {
       }
     }
   } else {
-    // 꺼져 있을 때
     if (speechTimer >= SPEECH_OFF_TIME) {
       speechTimer   = 0;
       speechVisible = true;
@@ -531,9 +757,9 @@ function updateSpeech(dt) {
 }
 
 // ======================= 애니메이션 업데이트 =======================
-function updatePlayerAnimation(dt, slowScale) {
+function updatePlayerAnimation(dt, slowScale, hasCiCollision) {
   if (playerFramesLoaded < 1) return;
-  if (update.hasCiCollisionThisFrame) return;
+  if (hasCiCollision) return;
 
   const animSpeed     = PLAYER_BASE_FPS * (0.7 + 0.3 * slowScale);
   const frameDuration = 1 / animSpeed;
@@ -641,7 +867,6 @@ function updateWalker(entity, dt, moveConfig) {
 
 // ======================= 메인 업데이트 =======================
 function update(dt) {
-  // 말풍선 (running 상태에서만)
   updateSpeech(dt);
 
   if (gameState !== "running") return;
@@ -763,7 +988,7 @@ function update(dt) {
   }
 
   // ----- 7) 애니메이션 -----
-  updatePlayerAnimation(dt, slowScale);
+  updatePlayerAnimation(dt, slowScale, hasCiCollision);
   updateObjectAnimation(dt);
 
   update.isSlowedThisFrame       = isSlowed;
@@ -817,6 +1042,8 @@ function draw() {
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
+    // 토스트도(혹시) 그리기
+    drawToast();
     return;
   }
 
@@ -830,29 +1057,26 @@ function draw() {
   const barW = 700;
   const barH = 10;
 
-  // 전체 빨간색 바
   ctx.fillStyle = "#960001";
   ctx.fillRect(barX, barY, barW, barH);
 
-  // 진행 구간 노란색으로 덮기
   ctx.fillStyle = "#ffb100";
   ctx.fillRect(barX, barY, barW * clamp(progress, 0, 1), barH);
 
-  // 외곽선
   ctx.strokeStyle = "#aaa";
   ctx.strokeRect(barX, barY, barW, barH);
 
   const isSlowed  = !!update.isSlowedThisFrame;
   const slowScale = update.slowScaleThisFrame ?? 1;
 
-  // ===== 상단 텍스트 ("롯데리아 사전예약까지") =====
+  // ===== 상단 텍스트 =====
   ctx.fillStyle = "#960001";
   ctx.font = "16px 'Pretendard'";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillText(`롯데리아 사전예약까지 : ${elapsedTime.toFixed(2)}초`, 50, 50);
 
-  // ===== 하단 중앙 감속 문구 (#960001) =====
+  // ===== 하단 중앙 감속 문구 =====
   if (isSlowed && gameState === "running") {
     const slowPercent = Math.round(slowScale * 100);
     const slowText = `밀려서 사전예약에 늦는 중 (${slowPercent}%)`;
@@ -1027,7 +1251,7 @@ function draw() {
       const isSlowedNow = !!update.isSlowedThisFrame;
       drawPlayer(isSlowedNow);
 
-      // 말풍선 (x - 50, y - 30)
+      // 말풍선
       if (gameState === "running" && speechActive && speechVisible && speechLoaded) {
         const bx = player.x - 50;
         const by = player.y - 30;
@@ -1038,22 +1262,58 @@ function draw() {
 
   // ===== 게임 종료 오버레이 & END 화면 =====
   if (gameState === "finished") {
-    // 반투명 블랙 오버레이
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 그 위에 END.png 띄우기
     if (endLoaded) {
       ctx.drawImage(endImage, 0, 0, canvas.width, canvas.height);
     }
 
-    // 기록 텍스트: "~초"만, 중앙 정렬
+    // ===== END 버튼 배치/렌더링 =====
+    const leftPad = 600;
+    const topPad  = 150;
+
+    // Bu_1: (600,150)
+    const bu1X = leftPad;
+    const bu1Y = topPad;
+
+    // Bu_2: Bu_1 아래로 15px
+    const bu2X = leftPad;
+    const bu2Y = topPad + 42 + 15;
+
+    // Bu_3: Bu_2 오른쪽 12px
+    const bu3X = bu2X + 42 + 12;
+    const bu3Y = bu2Y;
+
+    // Bu_4: Bu_3 오른쪽 12px
+    const bu4X = bu3X + 42 + 12;
+    const bu4Y = bu2Y;
+
+    draw.endButtonRects = {
+      bu1: { x: bu1X, y: bu1Y, w: 150, h: 42 },
+      bu2: { x: bu2X, y: bu2Y, w: 42,  h: 42 },
+      bu3: { x: bu3X, y: bu3Y, w: 42,  h: 42 },
+      bu4: { x: bu4X, y: bu4Y, w: 42,  h: 42 }
+    };
+
+    const map = draw.endButtonRects;
+    for (const b of endButtons) {
+      const r = map[b.key];
+      if (r && b.loaded) ctx.drawImage(b.img, r.x, r.y, r.w, r.h);
+    }
+
+    // 기록 텍스트
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
     ctx.font = "28px 'Pretendard'";
     ctx.fillText(`${elapsedTime.toFixed(2)}초`, canvas.width / 2, 305);
+  } else {
+    draw.endButtonRects = null;
   }
+
+  // 토스트는 항상 맨 위에
+  drawToast();
 }
 
 // ======================= 게임 루프 =======================
@@ -1062,6 +1322,7 @@ function gameLoop(t) {
   const dt = (t - lastTime) / 1000;
   lastTime = t;
 
+  updateToast(dt);
   update(dt);
   draw();
 
