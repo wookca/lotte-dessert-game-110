@@ -94,11 +94,8 @@
 
   <!-- 안내 텍스트 아래쪽에 버튼 3개 (세로로) -->
   <div id="bottom-controls">
-    <!-- 위: 동그란 ▲ 버튼 -->
     <button id="btn-up" class="direction-btn" aria-label="위로 이동">&#9650;</button>
-    <!-- 아래: 동그란 ▼ 버튼 -->
     <button id="btn-down" class="direction-btn" aria-label="아래로 이동">&#9660;</button>
-    <!-- 다시하기: 가로 버튼 -->
     <button id="btn-restart" class="restart-btn">다시하기</button>
   </div>
 
@@ -122,6 +119,14 @@ const YOUTUBE_URL = "https://www.youtube.com/watch?v=yfsR3TgRbTU";
 const BU1_URL = "https://m.booking.naver.com/booking/6/bizes/1553263/items/7258189?startDate=2025-12-09";
 const BU3_TEXT_TO_COPY = "https://wookca.github.io/lotte-dessert-game-110/";
 
+// ======================= 그림자 스타일(요청 반영) =======================
+// 플레이어 그림자 색 계열과 동일한 RGB로 오브젝트/ZI도 통일
+const SHADOW_RGBA = "rgba(0, 14, 82, 0.4)";
+const SHADOW_RGBA_STRONG = "rgba(0, 14, 82, 0.5)";
+
+// ======================= END 버튼 캡쳐 숨김 플래그(요청 반영) =======================
+let suppressEndButtonsForCapture = false;
+
 // ======================= 토스트(복사됨) =======================
 let toastText = "";
 let toastTimer = 0; // seconds
@@ -131,7 +136,6 @@ function showToast(text, duration = 1.4) {
   toastTimer = duration;
 }
 
-// 매 프레임 감소 (running/finished 모두에서 동작)
 function updateToast(dt) {
   if (toastTimer > 0) {
     toastTimer -= dt;
@@ -152,8 +156,6 @@ function drawToast() {
   ctx.textBaseline = "middle";
 
   const paddingX = 14;
-  const paddingY = 10;
-
   const textW = ctx.measureText(toastText).width;
   const boxW = clamp(textW + paddingX * 2, 140, 520);
   const boxH = 34;
@@ -161,11 +163,9 @@ function drawToast() {
   const x = canvas.width / 2;
   const y = canvas.height - 45;
 
-  // 박스
   ctx.fillStyle = "rgba(0,0,0,0.75)";
   ctx.fillRect(x - boxW / 2, y - boxH / 2, boxW, boxH);
 
-  // 텍스트
   ctx.fillStyle = "#fff";
   ctx.fillText(toastText, x, y);
 
@@ -173,11 +173,12 @@ function drawToast() {
 }
 
 // ======================= 캡쳐 저장 (Bu_2) =======================
-// ======================= 캡쳐 저장 (Bu_2) =======================
+// - 캡쳐 시 END 버튼(Bu1~Bu4) 숨김 처리
+// - CORS/tainted 문제 토스트로 안내
 async function saveCanvasAsImage() {
   const filename = `lotte-dessert-${Date.now()}.png`;
 
-  // 0) CORS/tainted 캔버스 빠른 체크 (막혀있으면 여기서 throw)
+  // 0) tainted 체크
   try {
     canvas.toDataURL("image/png");
   } catch (err) {
@@ -186,60 +187,39 @@ async function saveCanvasAsImage() {
     return;
   }
 
-  // 1) 가능하면 저장 위치 선택창(Chrome/Edge + https/localhost)
-  if (window.showSaveFilePicker) {
-    try {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: filename,
-        types: [{
-          description: "PNG Image",
-          accept: { "image/png": [".png"] }
-        }]
-      });
+  // 1) 캡쳐 전에 END 버튼 숨기고 한 번 렌더링
+  const prev = suppressEndButtonsForCapture;
+  suppressEndButtonsForCapture = true;
+  draw(); // 현재 프레임을 버튼 없이 다시 그림
 
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-      if (!blob) {
-        console.error("[CAPTURE] toBlob returned null");
-        showToast("저장 실패: 이미지 생성 불가");
-        return;
-      }
-
-      console.log("[CAPTURE] blob ok (save picker)", { type: blob.type, size: blob.size });
-
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-
-      showToast("저장 완료!");
-      return;
-    } catch (err) {
-      // 사용자가 취소한 경우도 여기로 옴
-      console.warn("[CAPTURE] save picker canceled/failed", err);
-      // 취소했으면 그냥 fallback으로 내려가게 하지 않고 종료할지 선택 가능
-      // 여기서는 "취소"면 그냥 종료:
-      showToast("저장 취소");
-      return;
-    }
-  }
-
-  // 2) 기본 방식: 다운로드 폴더로 저장 (저장 위치 창은 브라우저 설정에 따름)
+  // 2) Blob 생성
   if (!canvas.toBlob) {
-    // 구형 브라우저 fallback: 새 탭으로 열기
-    const dataUrl = canvas.toDataURL("image/png");
-    window.open(dataUrl, "_blank");
-    showToast("새 탭에서 이미지 열림");
+    // 구형 fallback
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+      window.open(dataUrl, "_blank");
+      showToast("새 탭에서 이미지 열림");
+    } finally {
+      suppressEndButtonsForCapture = prev;
+      draw(); // 원상복구 렌더
+    }
     return;
   }
 
   canvas.toBlob((blob) => {
+    // 3) 캡쳐 후 버튼 다시 보이게 원상복구 + 재렌더
+    suppressEndButtonsForCapture = prev;
+    draw();
+
     if (!blob) {
       console.error("[CAPTURE] toBlob returned null");
       showToast("저장 실패: 이미지 생성 불가");
       return;
     }
 
-    console.log("[CAPTURE] blob ok (download)", { type: blob.type, size: blob.size });
+    console.log("[CAPTURE] blob ok", { type: blob.type, size: blob.size });
 
+    // 4) 다운로드 트리거
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -262,16 +242,12 @@ async function saveCanvasAsImage() {
   }, "image/png");
 }
 
-
 // ======================= 링크 복사 (Bu_3) =======================
 async function copyTextToClipboard(text) {
-  // 최신
   if (navigator.clipboard && navigator.clipboard.writeText) {
     await navigator.clipboard.writeText(text);
     return true;
   }
-
-  // fallback
   const ta = document.createElement("textarea");
   ta.value = text;
   ta.setAttribute("readonly", "");
@@ -330,11 +306,11 @@ const ZI_SPAWN_INTERVAL_SECONDS   = 8;
 const CI_SPAWN_INTERVAL_SECONDS   = 5;
 
 // 말풍선
-const SPEECH_ON_TIME    = 0.8; // 켜져있는 시간
-const SPEECH_OFF_TIME   = 0.1; // 꺼져있는 시간
-const SPEECH_MAX_BLINKS = 4;   // 꺼질 때 기준 4번
+const SPEECH_ON_TIME    = 0.8;
+const SPEECH_OFF_TIME   = 0.1;
+const SPEECH_MAX_BLINKS = 4;
 
-// 이동/흔들림 설정 (wander 리셋시에 사용)
+// 이동/흔들림 설정
 const OBSTACLE_MOVE_CONFIG = {
   speedFactorMin: 0.7,
   speedFactorMax: 1.5,
@@ -371,7 +347,7 @@ const ZI_MOVE_CONFIG = {
 // ======================= 이미지 로딩 =======================
 // 메인 화면
 const mainImage = new Image();
-mainImage.src = "SRC/MAIN.png"; // 800x400
+mainImage.src = "SRC/MAIN.png";
 let mainLoaded = false;
 mainImage.onload = () => mainLoaded = true;
 
@@ -383,12 +359,11 @@ bgImage.onload = () => bgLoaded = true;
 
 // 종료 화면(END.png)
 const endImage = new Image();
-endImage.src = "SRC/END.png"; // 800x400
+endImage.src = "SRC/END.png";
 let endLoaded = false;
 endImage.onload = () => endLoaded = true;
 
 // ===== END 버튼 이미지 로딩 =====
-// Bu_1: 150x42, Bu_2~4: 42x42
 const endButtons = [
   { key: "bu1", img: new Image(), src: "SRC/Bu_1.png", w: 150, h: 42, loaded: false },
   { key: "bu2", img: new Image(), src: "SRC/Bu_2.png", w: 42,  h: 42, loaded: false },
@@ -402,14 +377,13 @@ for (const b of endButtons) {
 
 // 말풍선
 const speechImg = new Image();
-speechImg.src = "SRC/speech.png"; // 80x50
+speechImg.src = "SRC/speech.png";
 let speechLoaded = false;
 speechImg.onload = () => speechLoaded = true;
 
 // 플레이어 스프라이트
 const playerFrames = [];
 let playerFramesLoaded = 0;
-
 for (let i = 1; i <= PLAYER_FRAME_COUNT; i++) {
   const img = new Image();
   const num = String(i).padStart(5, "0");
@@ -418,7 +392,7 @@ for (let i = 1; i <= PLAYER_FRAME_COUNT; i++) {
   playerFrames.push(img);
 }
 
-// 오브젝트 스프라이트 (PO/BE/CO/FG/FN/JI/CI)
+// 오브젝트 스프라이트
 const objSpriteSets = {};
 OBJ_TYPES.forEach(type => {
   const frames = [];
@@ -437,7 +411,6 @@ OBJ_TYPES.forEach(type => {
 // ZI 스프라이트
 const ziFrames = [];
 let ziFramesLoaded = 0;
-
 for (let i = 1; i <= ZI_FRAME_COUNT; i++) {
   const img = new Image();
   const num = String(i).padStart(5, "0");
@@ -497,7 +470,6 @@ function startGameIfReady() {
   if (gameState === "ready") {
     gameState = "running";
 
-    // 말풍선 초기화 및 시작
     if (speechLoaded) {
       speechActive      = true;
       speechVisible     = true;
@@ -515,7 +487,6 @@ window.addEventListener("keydown", e => {
     startGameIfReady();
   }
 
-  // R키로 재시작 기능은 유지
   if (gameState === "finished" && e.code === "KeyR") resetGame();
 });
 
@@ -537,19 +508,16 @@ canvas.addEventListener("click", async (e) => {
   const btns = draw.endButtonRects;
   if (!btns) return;
 
-  // Bu_1: 네이버 예약 링크
   if (pointInRect(mx, my, btns.bu1)) {
     window.open(BU1_URL, "_blank");
     return;
   }
 
-  // Bu_2: 캡쳐 저장
   if (pointInRect(mx, my, btns.bu2)) {
     saveCanvasAsImage();
     return;
   }
 
-  // Bu_3: 링크 복사 + 토스트
   if (pointInRect(mx, my, btns.bu3)) {
     try {
       const ok = await copyTextToClipboard(BU3_TEXT_TO_COPY);
@@ -560,13 +528,11 @@ canvas.addEventListener("click", async (e) => {
     return;
   }
 
-  // Bu_4: 유튜브 이동
   if (pointInRect(mx, my, btns.bu4)) {
     window.open(YOUTUBE_URL, "_blank");
     return;
   }
-
-  // ✅ 버튼 밖 클릭: 아무 동작 없음 (기존 유튜브 이동 기능 삭제)
+  // 버튼 밖 클릭: 아무 동작 없음
 });
 
 // ======================= 초기화 =======================
@@ -591,17 +557,14 @@ function resetGame() {
   ziFrameIndex     = 0;
   ziFrameTimer     = 0;
 
-  // 말풍선 상태 리셋
   speechTimer      = 0;
   speechVisible    = false;
   speechBlinkCount = 0;
   speechActive     = false;
 
-  // 입력 상태도 리셋
   keys["ArrowUp"] = false;
   keys["ArrowDown"] = false;
 
-  // 토스트도 리셋(선택)
   toastText = "";
   toastTimer = 0;
 }
@@ -614,9 +577,7 @@ function clampObjectYForX(obj) {
   if (bgLoaded && bgImage.width) {
     const imgW = bgImage.width;
     const maxScroll = Math.max(imgW - canvas.width, 0);
-    const progress = goalDistance > 0
-      ? clamp(distance / goalDistance, 0, 1)
-      : 0;
+    const progress = goalDistance > 0 ? clamp(distance / goalDistance, 0, 1) : 0;
     const scrollX = maxScroll * progress;
 
     const centerX = obj.x + obj.w / 2;
@@ -625,7 +586,6 @@ function clampObjectYForX(obj) {
     const goalZoneWidth  = 600;
     const goalZoneStartX = imgW - goalZoneWidth;
 
-    // 우측 600px 구간이면 아래 140px 띠로만
     if (bgX >= goalZoneStartX) {
       const bandTop    = canvas.height - 140 - obj.h;
       const bandBottom = depthMaxY - obj.h;
@@ -873,14 +833,9 @@ function update(dt) {
 
   elapsedTime += dt;
 
-  // ----- 1) 충돌 누적 -----
-  let accum = {
-    totalClosenessWeighted: 0,
-    effectiveCount:         0
-  };
+  let accum = { totalClosenessWeighted: 0, effectiveCount: 0 };
   let hasCiCollision = false;
 
-  // 1-1) 일반/CI 오브젝트
   handleCollisionList(
     obstacles,
     {
@@ -893,7 +848,6 @@ function update(dt) {
     accum
   );
 
-  // 1-2) ZI (weight 1.2)
   handleCollisionList(
     specials,
     {
@@ -903,11 +857,10 @@ function update(dt) {
     accum
   );
 
-  // ----- 2) 슬로우 비율 계산 -----
   let slowScale = 1;
 
   if (hasCiCollision) {
-    slowScale = 0; // CI 충돌 → 플레이어 완전 정지
+    slowScale = 0;
   } else if (accum.effectiveCount > 0) {
     const avgCloseness = accum.totalClosenessWeighted / accum.effectiveCount;
     const countRough   = Math.round(accum.effectiveCount);
@@ -936,7 +889,6 @@ function update(dt) {
 
   const isSlowed = slowScale < 1;
 
-  // ----- 3) 거리 & 플레이어 이동 -----
   const distanceSpeed = baseSpeed * slowScale;
   const moveSpeedY    = player.baseSpeedY * slowScale;
 
@@ -951,7 +903,6 @@ function update(dt) {
 
   player.y = clamp(player.y, playerMinY, playerMaxY);
 
-  // ----- 4) 스폰 -----
   obstacleSpawnTimer -= dt;
   if (obstacleSpawnTimer <= 0) {
     spawnObstacle();
@@ -968,7 +919,6 @@ function update(dt) {
     nextCiSpawnTime += CI_SPAWN_INTERVAL_SECONDS;
   }
 
-  // ----- 5) 일반/CI 이동 -----
   for (let i = obstacles.length - 1; i >= 0; i--) {
     const o = obstacles[i];
     const moveConfig = o.isCI ? CI_MOVE_CONFIG : OBSTACLE_MOVE_CONFIG;
@@ -978,16 +928,12 @@ function update(dt) {
     if (o.x + o.w < 0) obstacles.splice(i, 1);
   }
 
-  // ----- 6) ZI 이동 -----
   for (let i = specials.length - 1; i >= 0; i--) {
     const s = specials[i];
-
     updateWalker(s, dt, ZI_MOVE_CONFIG);
-
     if (s.x + s.w < 0) specials.splice(i, 1);
   }
 
-  // ----- 7) 애니메이션 -----
   updatePlayerAnimation(dt, slowScale, hasCiCollision);
   updateObjectAnimation(dt);
 
@@ -1022,7 +968,6 @@ function drawPlayer(isSlowed) {
   }
 
   const img = playerFrames[playerFrameIndex % PLAYER_FRAME_COUNT];
-
   ctx.drawImage(
     img,
     0, 0, PLAYER_FRAME_WIDTH, PLAYER_FRAME_HEIGHT,
@@ -1034,7 +979,6 @@ function drawPlayer(isSlowed) {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // 시작 화면
   if (gameState === "ready") {
     if (mainLoaded) {
       ctx.drawImage(mainImage, 0, 0, canvas.width, canvas.height);
@@ -1042,15 +986,12 @@ function draw() {
       ctx.fillStyle = "#000";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
-    // 토스트도(혹시) 그리기
     drawToast();
     return;
   }
 
-  // ===== 실제 게임 화면 (running + finished 둘 다) =====
   drawBackground();
 
-  // ===== 진행도 바 =====
   const progress = distance / goalDistance;
   const barX = 50;
   const barY = 20;
@@ -1069,14 +1010,12 @@ function draw() {
   const isSlowed  = !!update.isSlowedThisFrame;
   const slowScale = update.slowScaleThisFrame ?? 1;
 
-  // ===== 상단 텍스트 =====
   ctx.fillStyle = "#960001";
   ctx.font = "16px 'Pretendard'";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillText(`롯데리아 사전예약까지 : ${elapsedTime.toFixed(2)}초`, 50, 50);
 
-  // ===== 하단 중앙 감속 문구 =====
   if (isSlowed && gameState === "running") {
     const slowPercent = Math.round(slowScale * 100);
     const slowText = `밀려서 사전예약에 늦는 중 (${slowPercent}%)`;
@@ -1088,10 +1027,8 @@ function draw() {
     ctx.fillText(slowText, canvas.width / 2, canvas.height - 20);
   }
 
-  // 레이어링용 리스트
   const renderList = [];
 
-  // 일반/CI 오브젝트
   for (const o of obstacles) {
     let t = (o.y - depthMinY) / (depthMaxY - depthMinY);
     t = clamp(t, 0, 1);
@@ -1107,18 +1044,9 @@ function draw() {
     const centerY = o.y + o.h / 2;
     const groundY = centerY + drawH * 0.35;
 
-    renderList.push({
-      type:    "obj",
-      ref:     o,
-      drawW,
-      drawH,
-      centerX,
-      centerY,
-      groundY
-    });
+    renderList.push({ type:"obj", ref:o, drawW, drawH, centerX, centerY, groundY });
   }
 
-  // ZI
   for (const s of specials) {
     let t = (s.y - depthMinY) / (depthMaxY - depthMinY);
     t = clamp(t, 0, 1);
@@ -1134,47 +1062,33 @@ function draw() {
     const centerY = s.y + s.h / 2;
     const groundY = centerY + drawH * 0.35;
 
-    renderList.push({
-      type:    "zi",
-      ref:     s,
-      drawW,
-      drawH,
-      centerX,
-      centerY,
-      groundY
-    });
+    renderList.push({ type:"zi", ref:s, drawW, drawH, centerX, centerY, groundY });
   }
 
-  // 플레이어
   const playerGroundY = player.y + player.h - 15;
-  renderList.push({
-    type: "player",
-    ref:  player,
-    groundY: playerGroundY
-  });
+  renderList.push({ type:"player", ref:player, groundY: playerGroundY });
 
-  // 깊이 순 정렬
   renderList.sort((a, b) => a.groundY - b.groundY);
 
-  // 렌더링
   for (const item of renderList) {
     if (item.type === "obj") {
       const o = item.ref;
       const { drawW, drawH, centerX, centerY } = item;
 
-      // 그림자
-      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      // ✅ 그림자 색 통일 + ✅ CI 그림자 Y를 아래로 10px (요청 반영)
+      const ciOffsetY = o.isCI ? 10 : 0;
+
+      ctx.fillStyle = SHADOW_RGBA;
       ctx.beginPath();
       ctx.ellipse(
         centerX,
-        centerY + drawH * 0.35,
+        centerY + drawH * 0.35 + ciOffsetY,
         drawW * 0.25,
         drawH * 0.1,
         0, 0, Math.PI * 2
       );
       ctx.fill();
 
-      // 스프라이트
       const spriteType = o.spriteType || "PO";
       const spriteSet  = objSpriteSets[spriteType];
 
@@ -1184,15 +1098,9 @@ function draw() {
         const dx = centerX - drawW / 2;
         const dy = centerY - drawH / 2;
 
-        ctx.drawImage(
-          img,
-          0, 0, OBJ_FRAME_WIDTH, OBJ_FRAME_HEIGHT,
-          dx, dy, drawW, drawH
-        );
+        ctx.drawImage(img, 0, 0, OBJ_FRAME_WIDTH, OBJ_FRAME_HEIGHT, dx, dy, drawW, drawH);
       } else {
-        ctx.fillStyle = o.colliding
-          ? (o.isCI ? "#ff0000" : "#ffb366")
-          : "#8b4513";
+        ctx.fillStyle = o.colliding ? (o.isCI ? "#ff0000" : "#ffb366") : "#8b4513";
         ctx.beginPath();
         ctx.ellipse(centerX, centerY, drawW / 2, drawH / 2, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -1202,8 +1110,8 @@ function draw() {
       const s = item.ref;
       const { drawW, drawH, centerX, centerY } = item;
 
-      // 그림자
-      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      // ✅ 그림자 색 통일(조금 더 진하게)
+      ctx.fillStyle = SHADOW_RGBA_STRONG;
       ctx.beginPath();
       ctx.ellipse(
         centerX,
@@ -1214,30 +1122,20 @@ function draw() {
       );
       ctx.fill();
 
-      // 스프라이트
       if (ziFramesLoaded > 0) {
         const img = ziFrames[ziFrameIndex % ZI_FRAME_COUNT];
         const dx  = centerX - drawW / 2;
         const dy  = centerY - drawH / 2;
 
-        ctx.drawImage(
-          img,
-          0, 0, ZI_FRAME_WIDTH, ZI_FRAME_HEIGHT,
-          dx, dy, drawW, drawH
-        );
+        ctx.drawImage(img, 0, 0, ZI_FRAME_WIDTH, ZI_FRAME_HEIGHT, dx, dy, drawW, drawH);
       } else {
         ctx.fillStyle = s.colliding ? "#ff4444" : "#aa0000";
-        ctx.fillRect(
-          centerX - drawW / 2,
-          centerY - drawH / 2,
-          drawW,
-          drawH
-        );
+        ctx.fillRect(centerX - drawW / 2, centerY - drawH / 2, drawW, drawH);
       }
 
     } else if (item.type === "player") {
-      // 그림자
-      ctx.fillStyle = "rgba(0, 14, 82, 0.4)";
+      // 플레이어 그림자(기존 색 유지)
+      ctx.fillStyle = SHADOW_RGBA;
       ctx.beginPath();
       ctx.ellipse(
         player.x + player.w / 2,
@@ -1251,7 +1149,6 @@ function draw() {
       const isSlowedNow = !!update.isSlowedThisFrame;
       drawPlayer(isSlowedNow);
 
-      // 말풍선
       if (gameState === "running" && speechActive && speechVisible && speechLoaded) {
         const bx = player.x - 50;
         const by = player.y - 30;
@@ -1260,7 +1157,6 @@ function draw() {
     }
   }
 
-  // ===== 게임 종료 오버레이 & END 화면 =====
   if (gameState === "finished") {
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1273,19 +1169,15 @@ function draw() {
     const leftPad = 600;
     const topPad  = 150;
 
-    // Bu_1: (600,150)
     const bu1X = leftPad;
     const bu1Y = topPad;
 
-    // Bu_2: Bu_1 아래로 15px
     const bu2X = leftPad;
     const bu2Y = topPad + 42 + 15;
 
-    // Bu_3: Bu_2 오른쪽 12px
     const bu3X = bu2X + 42 + 12;
     const bu3Y = bu2Y;
 
-    // Bu_4: Bu_3 오른쪽 12px
     const bu4X = bu3X + 42 + 12;
     const bu4Y = bu2Y;
 
@@ -1296,13 +1188,15 @@ function draw() {
       bu4: { x: bu4X, y: bu4Y, w: 42,  h: 42 }
     };
 
-    const map = draw.endButtonRects;
-    for (const b of endButtons) {
-      const r = map[b.key];
-      if (r && b.loaded) ctx.drawImage(b.img, r.x, r.y, r.w, r.h);
+    // ✅ 캡쳐 시에는 버튼 이미지가 보이지 않게(요청 반영)
+    if (!suppressEndButtonsForCapture) {
+      const map = draw.endButtonRects;
+      for (const b of endButtons) {
+        const r = map[b.key];
+        if (r && b.loaded) ctx.drawImage(b.img, r.x, r.y, r.w, r.h);
+      }
     }
 
-    // 기록 텍스트
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
@@ -1312,7 +1206,6 @@ function draw() {
     draw.endButtonRects = null;
   }
 
-  // 토스트는 항상 맨 위에
   drawToast();
 }
 
@@ -1335,7 +1228,6 @@ const btnUp = document.getElementById("btn-up");
 const btnDown = document.getElementById("btn-down");
 const btnRestart = document.getElementById("btn-restart");
 
-// 방향 버튼: 누르고 있는 동안 keys["ArrowUp"/"ArrowDown"] 유지
 function bindHoldButton(button, keyCode) {
   if (!button) return;
 
