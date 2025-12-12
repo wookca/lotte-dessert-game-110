@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
 
-  <!-- ✅ Step 1) 모바일 뷰포트 설정 -->
+  <!-- 모바일 화면 최적화 -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 
   <title>롯데리아 디저트 사전예약</title>
@@ -36,7 +36,6 @@
       line-height: 1.4;
     }
 
-    /* 하단 컨트롤 버튼 영역 (텍스트 아래) */
     #bottom-controls {
       margin-top: 16px;
       width: 100%;
@@ -54,7 +53,7 @@
       color: #f5f5f5;
       font-weight: 600;
       cursor: pointer;
-      touch-action: manipulation; /* 모바일 더블탭 확대 방지 */
+      touch-action: manipulation;
     }
 
     #bottom-controls button:active {
@@ -62,37 +61,35 @@
       background: #444;
     }
 
-    /* 방향 버튼: 동그란 원형 + 매우 크게 (160x160) */
     .direction-btn {
-      width: 160px;
-      height: 160px;
+      width: 320px;
+      height: 320px;
       border-radius: 50%;
-      font-size: 96px;   /* 화살표 크게 */
+      font-size: 96px;
       line-height: 1;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
-    /* 다시하기 버튼: 가로로 긴 버튼 */
     .restart-btn {
       width: 100%;
-      max-width: 160px;
+      max-width: 320px;
       border-radius: 999px;
       font-size: 16px;
       padding: 12px 0;
       min-height: 44px;
     }
 
-    /* ✅ Step 2) 모바일에서는 캔버스를 가로 꽉 채우게 확대 */
+    /* 모바일: 캔버스 가로 꽉 채우기 */
     @media (max-width: 900px) {
       #gameCanvas {
-        width: 100vw;      /* 화면 가로 꽉 채우기 */
-        height: auto;      /* 비율 유지 */
+        width: 100vw;
+        height: auto;
         max-width: 100vw;
       }
       body {
-        margin-top: 0;     /* 위 여백 제거 */
+        margin-top: 0;
       }
     }
   </style>
@@ -120,15 +117,9 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-function randRange(min, max) {
-  return min + Math.random() * (max - min);
-}
-function clamp(value, min, max) {
-  return value < min ? min : (value > max ? max : value);
-}
-function pointInRect(px, py, r) {
-  return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h;
-}
+function randRange(min, max) { return min + Math.random() * (max - min); }
+function clamp(value, min, max) { return value < min ? min : (value > max ? max : value); }
+function pointInRect(px, py, r) { return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h; }
 
 // ======================= 외부 링크/텍스트 =======================
 const YOUTUBE_URL = "https://www.youtube.com/watch?v=yfsR3TgRbTU";
@@ -142,7 +133,7 @@ const SHADOW_RGBA_STRONG = "rgba(0, 14, 82, 0.5)";
 // ======================= END 버튼 캡쳐 숨김 플래그 =======================
 let suppressEndButtonsForCapture = false;
 
-// ======================= 토스트(복사됨) =======================
+// ======================= 토스트 =======================
 let toastText = "";
 let toastTimer = 0;
 
@@ -259,100 +250,99 @@ async function copyTextToClipboard(text) {
   ta.select();
 
   let ok = false;
-  try {
-    ok = document.execCommand("copy");
-  } catch (_) {
-    ok = false;
-  }
+  try { ok = document.execCommand("copy"); } catch (_) { ok = false; }
   ta.remove();
   return ok;
 }
 
 // ======================= 전역 상수 =======================
+// 진행/속도
 const baseSpeed       = 280;
 const MIN_SLOW_FACTOR = 0.05;
 const goalDistance    = baseSpeed * 10;
 
+// 깊이/레이어
 const depthMinY = 140;
 const depthMaxY = canvas.height - 30;
 
+// 2.5D 스케일(오브젝트와 동일한 범위)
+const DEPTH_MIN_SCALE = 0.85;
+const DEPTH_MAX_SCALE = 1.15;
+
+// 플레이어
 const PLAYER_FRAME_COUNT  = 10;
 const PLAYER_FRAME_WIDTH  = 100;
 const PLAYER_FRAME_HEIGHT = 100;
 const PLAYER_BASE_FPS     = 10;
 
+// 오브젝트
 const OBJ_FRAME_COUNT  = 10;
 const OBJ_FRAME_WIDTH  = 100;
 const OBJ_FRAME_HEIGHT = 100;
 const OBJ_TYPES = ["PO", "BE", "CO", "FG", "FN", "JI", "CI"];
 const OBJ_BASE_FPS = 8;
 
+// ZI
 const ZI_FRAME_COUNT  = 10;
 const ZI_FRAME_WIDTH  = 200;
 const ZI_FRAME_HEIGHT = 200;
 const ZI_BASE_FPS     = 8;
 
+// 판정 스케일
 const PLAYER_HITBOX_SCALE = 0.8;
 const OBJECT_HITBOX_SCALE = 0.6;
 
+// 스폰/타이밍
 const OBSTACLE_SPAWN_INTERVAL_MIN = 0.2;
 const OBSTACLE_SPAWN_INTERVAL_MAX = 0.4;
 const ZI_SPAWN_INTERVAL_SECONDS   = 8;
 const CI_SPAWN_INTERVAL_SECONDS   = 5;
 
+// 말풍선
 const SPEECH_ON_TIME    = 0.8;
 const SPEECH_OFF_TIME   = 0.1;
 const SPEECH_MAX_BLINKS = 4;
 
+// 이동/흔들림 설정
 const OBSTACLE_MOVE_CONFIG = {
-  speedFactorMin: 0.7,
-  speedFactorMax: 1.5,
-  wiggleAmpMin:   2,
-  wiggleAmpMax:   8,
-  wiggleFreqMin:  1,
-  wiggleFreqMax:  4,
-  wanderMin:      0.7,
-  wanderMax:      2.2
+  speedFactorMin: 0.7, speedFactorMax: 1.5,
+  wiggleAmpMin: 2, wiggleAmpMax: 8,
+  wiggleFreqMin: 1, wiggleFreqMax: 4,
+  wanderMin: 0.7, wanderMax: 2.2
 };
-
 const CI_MOVE_CONFIG = {
-  speedFactorMin: 2.0,
-  speedFactorMax: 3.0,
-  wiggleAmpMin:   1,
-  wiggleAmpMax:   3,
-  wiggleFreqMin:  2,
-  wiggleFreqMax:  5,
-  wanderMin:      0.5,
-  wanderMax:      1.5
+  speedFactorMin: 2.0, speedFactorMax: 3.0,
+  wiggleAmpMin: 1, wiggleAmpMax: 3,
+  wiggleFreqMin: 2, wiggleFreqMax: 5,
+  wanderMin: 0.5, wanderMax: 1.5
 };
-
 const ZI_MOVE_CONFIG = {
-  speedFactorMin: 0.6,
-  speedFactorMax: 1.0,
-  wiggleAmpMin:   2,
-  wiggleAmpMax:   6,
-  wiggleFreqMin:  0.8,
-  wiggleFreqMax:  2.3,
-  wanderMin:      1.0,
-  wanderMax:      3.0
+  speedFactorMin: 0.6, speedFactorMax: 1.0,
+  wiggleAmpMin: 2, wiggleAmpMax: 6,
+  wiggleFreqMin: 0.8, wiggleFreqMax: 2.3,
+  wanderMin: 1.0, wanderMax: 3.0
 };
 
 // ======================= 이미지 로딩 =======================
+// 메인 화면
 const mainImage = new Image();
 mainImage.src = "SRC/MAIN.png";
 let mainLoaded = false;
 mainImage.onload = () => mainLoaded = true;
 
+// 배경
 const bgImage = new Image();
 bgImage.src = "SRC/BG.png";
 let bgLoaded = false;
 bgImage.onload = () => bgLoaded = true;
 
+// 종료 화면
 const endImage = new Image();
 endImage.src = "SRC/END.png";
 let endLoaded = false;
 endImage.onload = () => endLoaded = true;
 
+// END 버튼
 const endButtons = [
   { key: "bu1", img: new Image(), src: "SRC/Bu_1.png", w: 150, h: 42, loaded: false },
   { key: "bu2", img: new Image(), src: "SRC/Bu_2.png", w: 42,  h: 42, loaded: false },
@@ -364,11 +354,13 @@ for (const b of endButtons) {
   b.img.onload = () => (b.loaded = true);
 }
 
+// 말풍선
 const speechImg = new Image();
 speechImg.src = "SRC/speech.png";
 let speechLoaded = false;
 speechImg.onload = () => speechLoaded = true;
 
+// 플레이어 스프라이트
 const playerFrames = [];
 let playerFramesLoaded = 0;
 for (let i = 1; i <= PLAYER_FRAME_COUNT; i++) {
@@ -379,6 +371,7 @@ for (let i = 1; i <= PLAYER_FRAME_COUNT; i++) {
   playerFrames.push(img);
 }
 
+// 오브젝트 스프라이트
 const objSpriteSets = {};
 OBJ_TYPES.forEach(type => {
   const frames = [];
@@ -394,6 +387,7 @@ OBJ_TYPES.forEach(type => {
   }
 });
 
+// ZI 스프라이트
 const ziFrames = [];
 let ziFramesLoaded = 0;
 for (let i = 1; i <= ZI_FRAME_COUNT; i++) {
@@ -405,14 +399,18 @@ for (let i = 1; i <= ZI_FRAME_COUNT; i++) {
 }
 
 // ======================= 상태값 =======================
+// 플레이어
 const player = { x: 100, y: 100, w: 100, h: 100, baseSpeedY: 260, color: "#ffd966" };
+
 const playerMinY = 110;
 const playerMaxY = canvas.height - player.h;
 
+// 애니메이션
 let playerFrameIndex = 0, playerFrameTimer = 0;
 let objFrameIndex = 0, objFrameTimer = 0;
 let ziFrameIndex = 0, ziFrameTimer = 0;
 
+// 게임 진행
 let distance = 0;
 let elapsedTime = 0;
 let obstacles = [];
@@ -425,14 +423,16 @@ let nextCiSpawnTime = CI_SPAWN_INTERVAL_SECONDS;
 let gameState = "ready";
 let lastTime = 0;
 
+// 말풍선 상태
 let speechTimer = 0;
 let speechVisible = false;
 let speechBlinkCount = 0;
 let speechActive = false;
 
+// 입력
 const keys = {};
 
-// ======================= 시작 =======================
+// ======================= 공통: 시작 =======================
 function startGameIfReady() {
   if (gameState === "ready") {
     gameState = "running";
@@ -445,16 +445,15 @@ function startGameIfReady() {
   }
 }
 
-// ======================= 키보드 =======================
+// ======================= 입력(키보드) =======================
 window.addEventListener("keydown", e => {
   keys[e.code] = true;
-
   if (e.code === "ArrowUp" || e.code === "ArrowDown") startGameIfReady();
   if (gameState === "finished" && e.code === "KeyR") resetGame();
 });
 window.addEventListener("keyup", e => { keys[e.code] = false; });
 
-// ======================= END 클릭(버튼만) =======================
+// ======================= END 클릭: 버튼만 동작 =======================
 canvas.addEventListener("click", async (e) => {
   if (gameState !== "finished") return;
 
@@ -511,7 +510,14 @@ function resetGame() {
   toastTimer = 0;
 }
 
-// ======================= Y 범위 클램프 =======================
+// ======================= 깊이 스케일 계산(공통) =======================
+function depthScaleFromY(y) {
+  let t = (y - depthMinY) / (depthMaxY - depthMinY);
+  t = clamp(t, 0, 1);
+  return DEPTH_MIN_SCALE + t * (DEPTH_MAX_SCALE - DEPTH_MIN_SCALE);
+}
+
+// ======================= Y 범위 클램프(골 구간) =======================
 function clampObjectYForX(obj) {
   let minY = depthMinY;
   let maxY = depthMaxY - obj.h;
@@ -535,6 +541,7 @@ function clampObjectYForX(obj) {
       maxY = bandBottom;
     }
   }
+
   obj.y = clamp(obj.y, minY, maxY);
 }
 
@@ -657,7 +664,6 @@ function updatePlayerAnimation(dt, slowScale, hasCiCollision) {
     playerFrameIndex = (playerFrameIndex + 1) % PLAYER_FRAME_COUNT;
   }
 }
-
 function updateObjectAnimation(dt) {
   const frameDurationObj = 1 / OBJ_BASE_FPS;
   objFrameTimer += dt;
@@ -708,7 +714,6 @@ function handleCollisionList(list, options, accum) {
 
   for (const obj of list) {
     const { colliding, closeness } = computeClosenessFromPlayer(player, obj);
-
     if (colliding) {
       obj.colliding = true;
       const weight = weightFn(obj);
@@ -754,17 +759,32 @@ function update(dt) {
   let accum = { totalClosenessWeighted: 0, effectiveCount: 0 };
   let hasCiCollision = false;
 
+  // 1) 오브젝트/CI 충돌 누적
   handleCollisionList(obstacles, {
     player,
     weightFn: () => 1,
     onCollide(obj) { if (obj.isCI) hasCiCollision = true; }
   }, accum);
 
+  // 2) ZI 충돌 누적
   handleCollisionList(specials, {
     player,
     weightFn: () => 1.2
   }, accum);
 
+  // ✅ (난이도 조정) 플레이어가 최상단/최하단에 "붙어있으면" 1개 충돌과 동일 감속을 추가
+  // - CI 충돌(완전정지)이 있더라도 로직상 CI가 우선이라 그대로 유지됨
+  const EDGE_EPS = 0.0001;
+  const atTopEdge = player.y <= playerMinY + EDGE_EPS;
+  const atBottomEdge = player.y >= playerMaxY - EDGE_EPS;
+
+  if (atTopEdge || atBottomEdge) {
+    // "오브젝트와 충돌했을 때와 동일" → 평균 closeness=1, weight=1을 추가
+    accum.totalClosenessWeighted += 1 * 1;
+    accum.effectiveCount += 1;
+  }
+
+  // 3) 감속 계산
   let slowScale = 1;
 
   if (hasCiCollision) {
@@ -779,31 +799,46 @@ function update(dt) {
     else { tierMaxSpeed = 0.3; tierMinSpeed = 0.1; }
 
     if (tierMinSpeed < MIN_SLOW_FACTOR) tierMinSpeed = MIN_SLOW_FACTOR;
+
     const t = clamp(avgCloseness, 0, 1);
     slowScale = tierMaxSpeed - t * (tierMaxSpeed - tierMinSpeed);
     if (slowScale < MIN_SLOW_FACTOR) slowScale = MIN_SLOW_FACTOR;
   }
 
   const isSlowed = slowScale < 1;
+
+  // 4) 거리 & 플레이어 이동
   const distanceSpeed = baseSpeed * slowScale;
   const moveSpeedY = player.baseSpeedY * slowScale;
 
   distance += distanceSpeed * dt;
-  if (distance >= goalDistance) { distance = goalDistance; gameState = "finished"; }
+  if (distance >= goalDistance) {
+    distance = goalDistance;
+    gameState = "finished";
+  }
 
   if (keys["ArrowUp"]) player.y -= moveSpeedY * dt;
   if (keys["ArrowDown"]) player.y += moveSpeedY * dt;
   player.y = clamp(player.y, playerMinY, playerMaxY);
 
+  // 5) 스폰
   obstacleSpawnTimer -= dt;
   if (obstacleSpawnTimer <= 0) {
     spawnObstacle();
     obstacleSpawnTimer = randRange(OBSTACLE_SPAWN_INTERVAL_MIN, OBSTACLE_SPAWN_INTERVAL_MAX);
   }
 
-  if (elapsedTime >= nextZiSpawnTime) { spawnSpecial(); nextZiSpawnTime += ZI_SPAWN_INTERVAL_SECONDS; }
-  if (elapsedTime >= nextCiSpawnTime) { spawnCiRusher(); nextCiSpawnTime += CI_SPAWN_INTERVAL_SECONDS; }
+  if (elapsedTime >= nextZiSpawnTime) {
+    spawnSpecial();
+    nextZiSpawnTime += ZI_SPAWN_INTERVAL_SECONDS;
+  }
 
+  if (elapsedTime >= nextCiSpawnTime) {
+    spawnCiRusher();
+    nextCiSpawnTime += CI_SPAWN_INTERVAL_SECONDS;
+  }
+
+  // 6) 이동
   for (let i = obstacles.length - 1; i >= 0; i--) {
     const o = obstacles[i];
     updateWalker(o, dt, o.isCI ? CI_MOVE_CONFIG : OBSTACLE_MOVE_CONFIG);
@@ -816,6 +851,7 @@ function update(dt) {
     if (s.x + s.w < 0) specials.splice(i, 1);
   }
 
+  // 7) 애니메이션
   updatePlayerAnimation(dt, slowScale, hasCiCollision);
   updateObjectAnimation(dt);
 
@@ -842,19 +878,20 @@ function drawBackground() {
   ctx.drawImage(bgImage, -scrollX, 0, imgW, imgH);
 }
 
-function drawPlayer(isSlowed) {
+function drawPlayerSprite(drawX, drawY, drawW, drawH, isSlowed) {
   if (playerFramesLoaded < 1) {
     ctx.fillStyle = isSlowed ? "#ff8080" : player.color;
-    ctx.fillRect(player.x, player.y, player.w, player.h);
+    ctx.fillRect(drawX, drawY, drawW, drawH);
     return;
   }
   const img = playerFrames[playerFrameIndex % PLAYER_FRAME_COUNT];
-  ctx.drawImage(img, 0, 0, PLAYER_FRAME_WIDTH, PLAYER_FRAME_HEIGHT, player.x, player.y, PLAYER_FRAME_WIDTH, PLAYER_FRAME_HEIGHT);
+  ctx.drawImage(img, 0, 0, PLAYER_FRAME_WIDTH, PLAYER_FRAME_HEIGHT, drawX, drawY, drawW, drawH);
 }
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  // 시작 화면
   if (gameState === "ready") {
     if (mainLoaded) ctx.drawImage(mainImage, 0, 0, canvas.width, canvas.height);
     else { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
@@ -864,6 +901,7 @@ function draw() {
 
   drawBackground();
 
+  // 진행도 바
   const progress = distance / goalDistance;
   ctx.fillStyle = "#960001";
   ctx.fillRect(50, 20, 700, 10);
@@ -877,12 +915,14 @@ function draw() {
   const isSlowed = !!update.isSlowedThisFrame;
   const slowScale = update.slowScaleThisFrame ?? 1;
 
+  // 상단 텍스트
   ctx.fillStyle = "#960001";
   ctx.font = "16px 'Pretendard'";
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
   ctx.fillText(`롯데리아 사전예약까지 : ${elapsedTime.toFixed(2)}초`, 50, 50);
 
+  // 감속 문구
   if (isSlowed && gameState === "running") {
     const slowPercent = Math.round(slowScale * 100);
     ctx.fillStyle = "#960001";
@@ -892,13 +932,12 @@ function draw() {
     ctx.fillText(`밀려서 사전예약에 늦는 중 (${slowPercent}%)`, canvas.width / 2, canvas.height - 20);
   }
 
+  // 레이어 리스트
   const renderList = [];
 
+  // 오브젝트
   for (const o of obstacles) {
-    let t = (o.y - depthMinY) / (depthMaxY - depthMinY);
-    t = clamp(t, 0, 1);
-
-    const scale = 0.85 + t * (1.15 - 0.85);
+    const scale = depthScaleFromY(o.y);
     const drawW = OBJ_FRAME_WIDTH * scale;
     const drawH = OBJ_FRAME_HEIGHT * scale;
 
@@ -906,14 +945,12 @@ function draw() {
     const centerY = o.y + o.h / 2;
     const groundY = centerY + drawH * 0.35;
 
-    renderList.push({ type:"obj", ref:o, drawW, drawH, centerX, centerY, groundY });
+    renderList.push({ type:"obj", ref:o, scale, drawW, drawH, centerX, centerY, groundY });
   }
 
+  // ZI
   for (const s of specials) {
-    let t = (s.y - depthMinY) / (depthMaxY - depthMinY);
-    t = clamp(t, 0, 1);
-
-    const scale = 0.85 + t * (1.15 - 0.85);
+    const scale = depthScaleFromY(s.y);
     const drawW = ZI_FRAME_WIDTH * scale;
     const drawH = ZI_FRAME_HEIGHT * scale;
 
@@ -921,12 +958,40 @@ function draw() {
     const centerY = s.y + s.h / 2;
     const groundY = centerY + drawH * 0.35;
 
-    renderList.push({ type:"zi", ref:s, drawW, drawH, centerX, centerY, groundY });
+    renderList.push({ type:"zi", ref:s, scale, drawW, drawH, centerX, centerY, groundY });
   }
 
-  renderList.push({ type:"player", ref:player, groundY: player.y + player.h - 15 });
+  // ✅ 플레이어도 2.5D 스케일 적용
+  const playerScale = depthScaleFromY(player.y);
+  const pDrawW = PLAYER_FRAME_WIDTH * playerScale;
+  const pDrawH = PLAYER_FRAME_HEIGHT * playerScale;
+
+  const pCenterX = player.x + player.w / 2;
+
+  // 기존 feet 기준(바닥 정렬)을 스케일에 맞춰 보정
+  const baseFeetOffset = 15;                 // 기존 코드에서 사용하던 발 기준 오프셋
+  const feetOffsetScaled = baseFeetOffset * playerScale;
+  const pFeetY = (player.y + player.h) - feetOffsetScaled;
+
+  const pDrawX = pCenterX - pDrawW / 2;
+  const pDrawY = pFeetY - (pDrawH - feetOffsetScaled);
+
+  renderList.push({
+    type: "player",
+    scale: playerScale,
+    drawX: pDrawX,
+    drawY: pDrawY,
+    drawW: pDrawW,
+    drawH: pDrawH,
+    centerX: pCenterX,
+    feetY: pFeetY,
+    groundY: pFeetY
+  });
+
+  // 깊이 순 정렬
   renderList.sort((a, b) => a.groundY - b.groundY);
 
+  // 렌더
   for (const item of renderList) {
     if (item.type === "obj") {
       const o = item.ref;
@@ -944,7 +1009,9 @@ function draw() {
 
       if (spriteSet && spriteSet.loaded > 0) {
         const img = spriteSet.frames[objFrameIndex % spriteSet.frames.length];
-        ctx.drawImage(img, 0, 0, OBJ_FRAME_WIDTH, OBJ_FRAME_HEIGHT, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH);
+        const dx = centerX - drawW / 2;
+        const dy = centerY - drawH / 2;
+        ctx.drawImage(img, 0, 0, OBJ_FRAME_WIDTH, OBJ_FRAME_HEIGHT, dx, dy, drawW, drawH);
       } else {
         ctx.fillStyle = o.colliding ? (o.isCI ? "#ff0000" : "#ffb366") : "#8b4513";
         ctx.beginPath();
@@ -962,26 +1029,35 @@ function draw() {
 
       if (ziFramesLoaded > 0) {
         const img = ziFrames[ziFrameIndex % ZI_FRAME_COUNT];
-        ctx.drawImage(img, 0, 0, ZI_FRAME_WIDTH, ZI_FRAME_HEIGHT, centerX - drawW / 2, centerY - drawH / 2, drawW, drawH);
+        const dx = centerX - drawW / 2;
+        const dy = centerY - drawH / 2;
+        ctx.drawImage(img, 0, 0, ZI_FRAME_WIDTH, ZI_FRAME_HEIGHT, dx, dy, drawW, drawH);
       } else {
         ctx.fillStyle = "#aa0000";
         ctx.fillRect(centerX - drawW / 2, centerY - drawH / 2, drawW, drawH);
       }
 
     } else if (item.type === "player") {
+      const { drawX, drawY, drawW, drawH, centerX, feetY, scale } = item;
+
+      // 플레이어 그림자도 스케일 반영
       ctx.fillStyle = SHADOW_RGBA;
       ctx.beginPath();
-      ctx.ellipse(player.x + player.w / 2, player.y + player.h - 15, player.w * 0.25, player.h * 0.1, 0, 0, Math.PI * 2);
+      ctx.ellipse(centerX, feetY, drawW * 0.25, drawH * 0.1, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      drawPlayer(!!update.isSlowedThisFrame);
+      drawPlayerSprite(drawX, drawY, drawW, drawH, isSlowed);
 
+      // 말풍선도 스케일 기준 위치 보정
       if (gameState === "running" && speechActive && speechVisible && speechLoaded) {
-        ctx.drawImage(speechImg, player.x - 50, player.y - 30, 80, 50);
+        const bx = drawX - 50 * scale;
+        const by = drawY - 30 * scale;
+        ctx.drawImage(speechImg, bx, by, 80 * scale, 50 * scale);
       }
     }
   }
 
+  // END 화면
   if (gameState === "finished") {
     ctx.fillStyle = "rgba(0,0,0,0.55)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -989,7 +1065,7 @@ function draw() {
     if (endLoaded) ctx.drawImage(endImage, 0, 0, canvas.width, canvas.height);
 
     const leftPad = 600;
-    const topPad = 150;
+    const topPad  = 150;
 
     const bu1X = leftPad, bu1Y = topPad;
     const bu2X = leftPad, bu2Y = topPad + 42 + 15;
@@ -1023,7 +1099,7 @@ function draw() {
   drawToast();
 }
 
-// ======================= 루프 =======================
+// ======================= 게임 루프 =======================
 function gameLoop(t) {
   if (!lastTime) lastTime = t;
   const dt = (t - lastTime) / 1000;
@@ -1037,7 +1113,7 @@ function gameLoop(t) {
 }
 requestAnimationFrame(gameLoop);
 
-// ======================= 하단 버튼 =======================
+// ======================= 하단 버튼(모바일/PC) =======================
 const btnUp = document.getElementById("btn-up");
 const btnDown = document.getElementById("btn-down");
 const btnRestart = document.getElementById("btn-restart");
