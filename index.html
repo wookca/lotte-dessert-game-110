@@ -139,6 +139,32 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+// ======================= BGM =======================
+const BGM_SRC = "SRC/MON3_MIX_BGM.wav";   // ← 실제 파일 경로
+const BGM_GAP_MS = 1000;         // 1초 텀
+
+let bgmStarted = false;
+const bgm = new Audio(BGM_SRC);
+bgm.preload = "auto";
+
+bgm.addEventListener("ended", () => {
+  setTimeout(() => {
+    bgm.currentTime = 0;
+    bgm.play().catch(() => {});
+  }, BGM_GAP_MS);
+});
+
+function startBgmOnce() {
+  if (bgmStarted) return;
+  bgmStarted = true;
+
+  bgm.currentTime = 0;
+  bgm.play().catch(() => {
+    // 자동재생 막혔을 때 대비
+    bgmStarted = false;
+  });
+}
+
 function randRange(min, max) { return min + Math.random() * (max - min); }
 function clamp(value, min, max) { return value < min ? min : (value > max ? max : value); }
 function pointInRect(px, py, r) { return px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h; }
@@ -459,6 +485,8 @@ const keys = {};
 
 // ======================= 공통: 시작 =======================
 function startGameIfReady() {
+  startBgmOnce(); // ✅ 첫 입력 시 BGM 시작 (게임 상태와 무관)
+
   if (gameState === "ready") {
     gameState = "running";
     if (speechLoaded) {
