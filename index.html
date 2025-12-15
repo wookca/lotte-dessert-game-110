@@ -116,7 +116,6 @@
   </style>
 </head>
 
-
 <body>
   <canvas id="gameCanvas" width="800" height="400"></canvas>
 
@@ -346,8 +345,8 @@ const OBJECT_HITBOX_Y_FACTOR = 0.5;
 // 스폰/타이밍
 const OBSTACLE_SPAWN_INTERVAL_MIN = 0.2;
 const OBSTACLE_SPAWN_INTERVAL_MAX = 0.4;
-const ZI_SPAWN_INTERVAL_SECONDS   = 8;
-const CI_SPAWN_INTERVAL_SECONDS   = 5;
+const ZI_SPAWN_INTERVAL_SECONDS   = 5;
+const CI_SPAWN_INTERVAL_SECONDS   = 4;
 
 // 말풍선
 const SPEECH_ON_TIME    = 0.8;
@@ -393,12 +392,13 @@ endImage.src = "SRC/END.png";
 let endLoaded = false;
 endImage.onload = () => endLoaded = true;
 
-// END 버튼
+// END 버튼 + END 전용 이미지(Sp2)
 const endButtons = [
   { key: "bu1", img: new Image(), src: "SRC/Bu_1.png", w: 150, h: 42, loaded: false },
   { key: "bu2", img: new Image(), src: "SRC/Bu_2.png", w: 42,  h: 42, loaded: false },
   { key: "bu3", img: new Image(), src: "SRC/Bu_3.png", w: 42,  h: 42, loaded: false },
-  { key: "bu4", img: new Image(), src: "SRC/Bu_4.png", w: 42,  h: 42, loaded: false }
+  { key: "bu4", img: new Image(), src: "SRC/Bu_4.png", w: 42,  h: 42, loaded: false }, // ✅ 콤마 누락 수정
+  { key: "sp2", img: new Image(), src: "SRC/speech2.png", w: 100, h: 60, loaded: false } // ✅ 추가
 ];
 for (const b of endButtons) {
   b.img.src = b.src;
@@ -531,6 +531,8 @@ canvas.addEventListener("click", async (e) => {
     return;
   }
   if (pointInRect(mx, my, btns.bu4)) { window.open(YOUTUBE_URL, "_blank"); return; }
+
+  // ✅ sp2는 클릭 동작 없음 (요구사항)
 });
 
 // ======================= 리셋 =======================
@@ -831,13 +833,11 @@ function update(dt) {
   }, accum);
 
   // ✅ (난이도 조정) 플레이어가 최상단/최하단에 "붙어있으면" 1개 충돌과 동일 감속을 추가
-  // - CI 충돌(완전정지)이 있더라도 로직상 CI가 우선이라 그대로 유지됨
   const EDGE_EPS = 0.0001;
   const atTopEdge = player.y <= playerMinY + EDGE_EPS;
   const atBottomEdge = player.y >= playerMaxY - EDGE_EPS;
 
   if (atTopEdge || atBottomEdge) {
-    // "오브젝트와 충돌했을 때와 동일" → 평균 closeness=1, weight=1을 추가
     accum.totalClosenessWeighted += 1 * 1;
     accum.effectiveCount += 1;
   }
@@ -1026,8 +1026,7 @@ function draw() {
 
   const pCenterX = player.x + player.w / 2;
 
-  // 기존 feet 기준(바닥 정렬)을 스케일에 맞춰 보정
-  const baseFeetOffset = 15;                 // 기존 코드에서 사용하던 발 기준 오프셋
+  const baseFeetOffset = 15;
   const feetOffsetScaled = baseFeetOffset * playerScale;
   const pFeetY = (player.y + player.h) - feetOffsetScaled;
 
@@ -1098,7 +1097,6 @@ function draw() {
     } else if (item.type === "player") {
       const { drawX, drawY, drawW, drawH, centerX, feetY, scale } = item;
 
-      // 플레이어 그림자도 스케일 반영
       ctx.fillStyle = SHADOW_RGBA;
       ctx.beginPath();
       ctx.ellipse(centerX, feetY, drawW * 0.25, drawH * 0.1, 0, 0, Math.PI * 2);
@@ -1106,7 +1104,6 @@ function draw() {
 
       drawPlayerSprite(drawX, drawY, drawW, drawH, isSlowed);
 
-      // 말풍선도 스케일 기준 위치 보정
       if (gameState === "running" && speechActive && speechVisible && speechLoaded) {
         const bx = drawX - 50 * scale;
         const by = drawY - 30 * scale;
@@ -1130,11 +1127,15 @@ function draw() {
     const bu3X = bu2X + 42 + 12, bu3Y = bu2Y;
     const bu4X = bu3X + 42 + 12, bu4Y = bu2Y;
 
+    // ✅ sp2: 원하는 좌표 (639, 257), w100 h60
+    const sp2X = 637, sp2Y = 257;
+
     draw.endButtonRects = {
       bu1: { x: bu1X, y: bu1Y, w: 150, h: 42 },
       bu2: { x: bu2X, y: bu2Y, w: 42,  h: 42 },
       bu3: { x: bu3X, y: bu3Y, w: 42,  h: 42 },
-      bu4: { x: bu4X, y: bu4Y, w: 42,  h: 42 }
+      bu4: { x: bu4X, y: bu4Y, w: 42,  h: 42 },
+      sp2: { x: sp2X, y: sp2Y, w: 100, h: 60 }
     };
 
     if (!suppressEndButtonsForCapture) {
