@@ -145,20 +145,13 @@ const BGM_GAP_MS = 1000;         // 1초 텀
 let bgmStarted = false;
 const bgm = new Audio(BGM_SRC);
 bgm.preload = "auto";
-
-bgm.addEventListener("ended", () => {
-  setTimeout(() => {
-    bgm.play().catch(() => {});
-  }, BGM_GAP_MS);
-});
+bgm.loop = true;
 
 function startBgmOnce() {
   if (bgmStarted) return;
   bgmStarted = true;
 
-  bgm.currentTime = 0;
   bgm.play().catch(() => {
-    // 자동재생 막혔을 때 대비
     bgmStarted = false;
   });
 }
