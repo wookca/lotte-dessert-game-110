@@ -138,6 +138,11 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+
+// 캔버스 포커스
+canvas.tabIndex = 0; canvas.addEventListener("pointerdown", () => canvas.focus());
+
+
 // ======================= BGM =======================
 const BGM_SRC = "SRC/MON3_MIX_BGM.wav";   // ← 실제 파일 경로
 const BGM_GAP_MS = 1000;         // 1초 텀
