@@ -466,7 +466,7 @@ for (let i = 1; i <= ZI_FRAME_COUNT; i++) {
 
 // ======================= 상태값 =======================
 // 플레이어
-const player = { x: 100, y: 100, w: 100, h: 100, baseSpeedY: 260, color: "#ffd966" };
+const player = { x: 100, y: 200, w: 100, h: 100, baseSpeedY: 260, color: "#ffd966" };
 
 const playerMinY = 110;
 const playerMaxY = canvas.height - player.h;
@@ -567,7 +567,7 @@ function resetGame() {
   nextZiSpawnTime = ZI_SPAWN_INTERVAL_SECONDS;
   nextCiSpawnTime = CI_SPAWN_INTERVAL_SECONDS;
 
-  player.y = 160;
+  player.y = 200;
   gameState = "ready";
 
   playerFrameIndex = 0; playerFrameTimer = 0;
