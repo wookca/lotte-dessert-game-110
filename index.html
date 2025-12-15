@@ -148,6 +148,14 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
+// ======================= GA4 이벤트 헬퍼 =======================
+function track(eventName, params = {}) {
+  // 광고차단/로딩 타이밍 등으로 gtag가 없을 수도 있어서 안전하게
+  if (typeof window.gtag === "function") {
+    window.gtag("event", eventName, params);
+  }
+}
+
 
 // 캔버스 포커스
 canvas.tabIndex = 0; canvas.addEventListener("pointerdown", () => canvas.focus());
@@ -495,6 +503,8 @@ function startGameIfReady() {
   startBgmOnce(); // ✅ 첫 입력 시 BGM 시작 (게임 상태와 무관)
 
   if (gameState === "ready") {
+    track("game_start"); // ✅ 플레이 시작 카운트
+
     gameState = "running";
     if (speechLoaded) {
       speechActive = true;
@@ -509,7 +519,11 @@ function startGameIfReady() {
 window.addEventListener("keydown", e => {
   keys[e.code] = true;
   if (e.code === "ArrowUp" || e.code === "ArrowDown") startGameIfReady();
-  if (gameState === "finished" && e.code === "KeyQ") resetGame();
+
+  if (gameState === "finished" && e.code === "KeyQ") {
+    track("game_restart", { method: "key_q" }); // ✅ Q키 재시작 카운트
+    resetGame();
+  }
 });
 window.addEventListener("keyup", e => { keys[e.code] = false; });
 
@@ -877,10 +891,11 @@ function update(dt) {
   const moveSpeedY = player.baseSpeedY * slowScale;
 
   distance += distanceSpeed * dt;
-  if (distance >= goalDistance) {
-    distance = goalDistance;
-    gameState = "finished";
-  }
+if (distance >= goalDistance) {
+  distance = goalDistance;
+  track("game_finish", { time_sec: Number(elapsedTime.toFixed(2)) }); // ✅ 클리어 시간도 같이
+  gameState = "finished";
+}
 
   if (keys["ArrowUp"]) player.y -= moveSpeedY * dt;
   if (keys["ArrowDown"]) player.y += moveSpeedY * dt;
@@ -1213,6 +1228,7 @@ bindHoldButton(btnDown, "ArrowDown");
 if (btnRestart) {
   const doRestart = (e) => {
     e.preventDefault();
+    track("game_restart", { method: "button" }); // ✅ 버튼 재시작 카운트
     resetGame();
   };
   btnRestart.addEventListener("click", doRestart);
