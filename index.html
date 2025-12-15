@@ -551,7 +551,19 @@ canvas.addEventListener("click", async (e) => {
     }
     return;
   }
-  if (pointInRect(mx, my, btns.bu4)) { window.open(YOUTUBE_URL, "_blank"); return; }
+if (pointInRect(mx, my, btns.bu4)) {
+  // ✅ GA4: 유튜브 클릭 이벤트 기록
+  if (typeof window.gtag === "function") {
+    gtag("event", "youtube_click", {
+      link_url: YOUTUBE_URL,
+      where: "end_screen",
+      button: "bu4"
+    });
+  }
+
+  window.open(YOUTUBE_URL, "_blank");
+  return;
+}
 
   // ✅ sp2는 클릭 동작 없음 (요구사항)
 });
