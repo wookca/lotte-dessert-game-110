@@ -148,7 +148,6 @@ bgm.preload = "auto";
 
 bgm.addEventListener("ended", () => {
   setTimeout(() => {
-    bgm.currentTime = 0;
     bgm.play().catch(() => {});
   }, BGM_GAP_MS);
 });
