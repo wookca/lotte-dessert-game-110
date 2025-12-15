@@ -496,31 +496,12 @@ function startGameIfReady() {
 }
 
 // ======================= 입력(키보드) =======================
-window.addEventListener("keydown", (e) => {
-  // ✅ R 키는 “끝났을 때만” 허용 + 브라우저 단축키(리로드)도 차단
-  if (e.code === "KeyR") {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (gameState === "finished") resetGame();
-    return; // running/ready 에서는 R 완전 무시
-  }
-
-  // ✅ Ctrl+R / Cmd+R(새로고침)까지 확실히 막고 싶으면 이것도 추가
-  if ((e.ctrlKey || e.metaKey) && e.code === "KeyR") {
-    e.preventDefault();
-    e.stopPropagation();
-    return;
-  }
-
+window.addEventListener("keydown", e => {
   keys[e.code] = true;
-
   if (e.code === "ArrowUp" || e.code === "ArrowDown") startGameIfReady();
-}, { passive: false });
-
-window.addEventListener("keyup", (e) => {
-  keys[e.code] = false;
+  if (gameState === "finished" && e.code === "KeyQ") resetGame();
 });
+window.addEventListener("keyup", e => { keys[e.code] = false; });
 
 // ======================= END 클릭: 버튼만 동작 =======================
 canvas.addEventListener("click", async (e) => {
