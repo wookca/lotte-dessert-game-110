@@ -311,8 +311,11 @@ const ZI_FRAME_HEIGHT = 200;
 const ZI_BASE_FPS     = 8;
 
 // 판정 스케일
-const PLAYER_HITBOX_SCALE = 0.8;
-const OBJECT_HITBOX_SCALE = 0.6;
+const PLAYER_HITBOX_SCALE = 0.6;
+const OBJECT_HITBOX_SCALE = 0.5;
+
+// ✅ (난이도 조정) 오브젝트 판정 Y축 절반 축소
+const OBJECT_HITBOX_Y_FACTOR = 0.5;
 
 // 스폰/타이밍
 const OBSTACLE_SPAWN_INTERVAL_MIN = 0.2;
@@ -714,7 +717,9 @@ function computeClosenessFromPlayer(player, obj) {
   const oCenterY = obj.y + obj.h / 2;
 
   const oHalfW = (obj.w * OBJECT_HITBOX_SCALE) / 2;
-  const oHalfH = (obj.h * OBJECT_HITBOX_SCALE) / 2;
+
+  // ✅ (난이도 조정) 오브젝트 판정 Y축 절반 축소
+  const oHalfH = (obj.h * OBJECT_HITBOX_SCALE * OBJECT_HITBOX_Y_FACTOR) / 2;
 
   const dx = pCenterX - oCenterX;
   const dy = pCenterY - oCenterY;
@@ -757,7 +762,10 @@ function randomizeWalkerParams(entity, config) {
 }
 
 function updateWalker(entity, dt, moveConfig) {
-  const xSpeed = baseSpeed * entity.speedFactor;
+  // ✅ (난이도 조정) 충돌 시 오브젝트 감속 "절반만" 적용
+  const collisionSlow = entity.colliding ? 0.5 : 1.0;
+
+  const xSpeed = baseSpeed * entity.speedFactor * collisionSlow;
   entity.x -= xSpeed * dt;
 
   entity.wanderTimer -= dt;
